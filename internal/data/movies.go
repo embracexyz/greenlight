@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/embracexyz/greenlight/internal/validator"
@@ -123,6 +124,45 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 
 }
 
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
+	query := fmt.Sprintf(`
+		select count(*) over(), id, title, year, runtime, genres, version
+		from movies
+		where 
+			(to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) or $1 = '') 
+		and 
+			(genres @> $2 or $2 = '{}') 
+		order by %s %s, id ASC
+		limit $3 offset $4
+	`, filters.SortColumn(), filters.SortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres), filters.limit(), filters.offset())
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+	defer rows.Close()
+
+	totalRecords := 0
+	movies := []*Movie{}
+
+	for rows.Next() {
+		var movie Movie
+		err = rows.Scan(&totalRecords, &movie.ID, &movie.Title, &movie.Year, &movie.Runtime, pq.Array(&movie.Genres), &movie.Version)
+		if err != nil {
+			return nil, Metadata{}, err
+		}
+		movies = append(movies, &movie)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+	return movies, caclMetadata(totalRecords, filters.Page, filters.PageSize), nil
+
+}
 func ValidateMove(v *validator.Validator, movie *Movie) {
 	v.Check(movie.Title != "", "title", "must be provided")
 	v.Check(len(movie.Title) <= 500, "title", "must not be more than 500 bytes long")

@@ -9,6 +9,39 @@ import (
 	"github.com/embracexyz/greenlight/internal/validator"
 )
 
+func (app *application) listMoviesHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Title  string
+		Genres []string
+		data.Filters
+	}
+
+	v := validator.New()
+
+	input.Title = app.readString(r.URL.Query(), "title", "")
+	input.Genres = app.readCSV(r.URL.Query(), "genres", []string{})
+	input.Filters.Page = app.readInt(r.URL.Query(), "page", 1, v)
+	input.Filters.PageSize = app.readInt(r.URL.Query(), "page_size", 20, v)
+
+	input.Filters.Sort = app.readString(r.URL.Query(), "sort", "id")
+	input.Filters.SortSafelist = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
+
+	if data.ValidateFilters(v, &input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.FieldErrors)
+		return
+	}
+
+	movies, metadata, err := app.models.MovieModel.GetAll(input.Title, input.Genres, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	err = app.writeJson(w, http.StatusOK, envelope{"movies": movies, "metadata": metadata}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
 func (app *application) showMovieHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
 	if err != nil {
