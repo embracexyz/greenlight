@@ -124,7 +124,12 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	// 5. 更新，err则判断err类型，返回对应响应，happy path则write更新后的json
 	err = app.models.MovieModel.Update(movie)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
@@ -219,7 +224,12 @@ func (app *application) partialUpdateMovieHandler(w http.ResponseWriter, r *http
 	// 5. 更新，err则判断err类型，返回对应响应，happy path则write更新后的json
 	err = app.models.MovieModel.Update(movie)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 
