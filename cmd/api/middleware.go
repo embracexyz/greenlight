@@ -2,7 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"sync"
+	"time"
+
+	"golang.org/x/time/rate"
 )
 
 func (app *application) recoverPanic(next http.Handler) http.Handler {
@@ -13,6 +18,66 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 				app.serverErrorResponse(w, r, fmt.Errorf("%s", err))
 			}
 		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (app *application) rateLimit(next http.Handler) http.Handler {
+	// 这部分在初始化执行一次，所以limiter或者锁都是全局的
+	// 通过闭包方式被引用
+	// limiter := rate.NewLimiter(2, 4) // 初始4个token消耗额，一下子消耗完毕后，1/2s补充一个，即1s最多请求2次（连续请求时），且过一段时间不访问，最到能补充到4，如此循环
+	// 全局变量
+	type client struct {
+		limiter  *rate.Limiter
+		lastSeen time.Time
+	}
+
+	var (
+		mu      sync.Mutex
+		clients = make(map[string]*client)
+	)
+
+	if app.config.limiter.enabled {
+		go func() {
+			for {
+				time.Sleep(time.Minute)
+				mu.Lock()
+				for ip, client := range clients {
+					if time.Since(client.lastSeen) > time.Minute*3 {
+						delete(clients, ip)
+					}
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 这里开始是每个reqeust过来，启动一个goroutine处理请求，从一个handler开始直到业务handler都在一个goroutine里（期间不启动其他goroutine的话）
+		//		中间件、业务handler、router，都是handler，都实现了ServeHTTP方法，都会被在多个goroutine执行
+		// 所以要注意data race场景，
+		if app.config.limiter.enabled {
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+
+			// 访问同一个map，加锁
+			mu.Lock()
+			if _, ok := clients[ip]; !ok {
+				// 新客户端添加一个limiter
+				clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
+			}
+
+			clients[ip].lastSeen = time.Now()
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				app.rateLimmitExceededResponse(w, r)
+				return
+			}
+			mu.Unlock()
+		}
 		next.ServeHTTP(w, r)
 	})
 }
