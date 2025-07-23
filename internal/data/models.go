@@ -19,10 +19,16 @@ type Models struct {
 		Get(int64) (*Movie, error)
 		GetAll(string, []string, Filters) ([]*Movie, Metadata, error)
 	}
+	UserModel interface {
+		Insert(*User) error
+		GetByEmail(string) (*User, error)
+		Update(*User) error
+	}
 }
 
 func NewModels(db *sql.DB) Models {
 	return Models{
 		MovieModel: NewMovieModel(db),
+		UserModel:  NewUserModel(db),
 	}
 }
