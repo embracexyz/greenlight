@@ -38,6 +38,12 @@ func (app *application) serve() error {
 		defer cancel()
 		shutdownErr <- srv.Shutdown(ctx)
 
+		// wait background tasks
+		app.logger.PrintInfo("completing background tasks", map[string]string{
+			"addr": srv.Addr,
+		})
+		app.wg.Wait()
+
 	}()
 
 	app.logger.PrintInfo("starting %s server on %s", map[string]string{
@@ -56,6 +62,7 @@ func (app *application) serve() error {
 	if err != nil {
 		return err
 	}
+
 	app.logger.PrintInfo("stoped server.", map[string]string{
 		"addr": srv.Addr,
 	})

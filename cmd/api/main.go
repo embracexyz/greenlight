@@ -5,12 +5,15 @@ import (
 	"database/sql"
 	"flag"
 	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	_ "github.com/lib/pq"
 
 	"github.com/embracexyz/greenlight/internal/data"
 	"github.com/embracexyz/greenlight/internal/jsonlog"
+	"github.com/embracexyz/greenlight/internal/mailer"
 )
 
 const version = "1.0.0"
@@ -29,12 +32,21 @@ type config struct {
 		burst   int
 		enabled bool
 	}
+	smtp struct {
+		host   string
+		port   int
+		user   string
+		pass   string
+		sender string
+	}
 }
 
 type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
+	wg     sync.WaitGroup
 }
 
 func openDB(cfg config) (*sql.DB, error) {
@@ -79,6 +91,16 @@ func main() {
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter")
 
+	flag.StringVar(&cfg.smtp.host, "smtp-host", os.Getenv("GREENLIGHT_SMTP_HOST"), "smtp-host")
+	smtpPort, err := strconv.Atoi(os.Getenv("GREENLIGHT_SMTP_PORT"))
+	if err != nil {
+		panic("invalid smtp port")
+	}
+	flag.IntVar(&cfg.smtp.port, "smtp-port", smtpPort, "smtp-port")
+	flag.StringVar(&cfg.smtp.user, "smtp-user", os.Getenv("GREENLIGHT_SMTP_USER"), "smtp-user")
+	flag.StringVar(&cfg.smtp.pass, "smtp-pass", os.Getenv("GREENLIGHT_SMTP_PASS"), "smtp-pass")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", os.Getenv("GREENLIGHT_SMTP_SENDER"), "smtp-sender")
+
 	flag.Parse()
 
 	logger := jsonlog.New(os.Stdout, jsonlog.INFO)
@@ -96,6 +118,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.user, cfg.smtp.pass, cfg.smtp.sender),
 	}
 
 	err = app.serve()
