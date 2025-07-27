@@ -24,6 +24,7 @@ type Models struct {
 		Insert(*User) error
 		GetByEmail(string) (*User, error)
 		Update(*User) error
+		GetForToken(string, string) (*User, error)
 	}
 	TokenModel interface {
 		New(int64, time.Duration, string) (*Token, error)
