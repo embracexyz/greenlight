@@ -14,12 +14,14 @@ func (app *application) routes() http.Handler {
 
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 
-	router.HandlerFunc(http.MethodGet, "/v1/movies", app.listMoviesHandler)
-	router.HandlerFunc(http.MethodPost, "/v1/movies", app.createMovieHandler)
-	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.showMovieHandler)
-	router.HandlerFunc(http.MethodPut, "/v1/movies/:id", app.updateMovieHandler)
-	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.partialUpdateMovieHandler)
-	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteMovieHandler)
+	// 所有登录账户即可访问
+	router.HandlerFunc(http.MethodGet, "/v1/movies", app.authenticatedRequired(app.listMoviesHandler))
+	// 登录且激活账户可访问
+	router.HandlerFunc(http.MethodPost, "/v1/movies", app.authenticatedActivated(app.createMovieHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.authenticatedActivated(app.showMovieHandler))
+	router.HandlerFunc(http.MethodPut, "/v1/movies/:id", app.authenticatedActivated(app.updateMovieHandler))
+	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.authenticatedActivated(app.partialUpdateMovieHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.authenticatedActivated(app.deleteMovieHandler))
 
 	// users
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)

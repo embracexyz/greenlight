@@ -71,3 +71,15 @@ func (app *application) invalidAuthenticationTokenResponse(w http.ResponseWriter
 	message := "invalid or missing authentication token"
 	app.errorResponse(w, r, http.StatusUnauthorized, message)
 }
+
+// 需要登录，否则返回401
+func (app *application) authenticationRequiredResponse(w http.ResponseWriter, r *http.Request) {
+	message := "you must be authenticated to access this resource"
+	app.errorResponse(w, r, http.StatusUnauthorized, message)
+}
+
+// 需要有权限，鉴权第一步就是得是个激活账户
+func (app *application) inactiveAccountResponse(w http.ResponseWriter, r *http.Request) {
+	message := "your user account must be activated to access this resource"
+	app.errorResponse(w, r, http.StatusForbidden, message)
+}

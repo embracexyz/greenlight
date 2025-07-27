@@ -86,13 +86,15 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	})
 }
 
+// 将用户信息attach到context，即认证为（合法用户or匿名用户）；后续通过user的信息再进行鉴权中间件处理
 func (app *application) authentication(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
 		// 如果没带就是匿名用户, attach 到context，供工具中间件、或者业务handler处理所需
 		authorizationHeader := r.Header.Get("Authorization")
 		if authorizationHeader == "" {
-			app.setContextUser(r, data.AnoymousUser)
+			// 更新新的reqeust
+			r = app.setContextUser(r, data.AnoymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -124,7 +126,35 @@ func (app *application) authentication(next http.Handler) http.Handler {
 			return
 		}
 
-		app.setContextUser(r, user)
+		r = app.setContextUser(r, user)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// 上面只是进行了信息查询、user attach；并未对认证后的用户进行鉴权
+
+// 鉴权：需要登录过(非匿名账户); 被其包裹的中间件，只需是登录用户即可
+func (app *application) authenticatedRequired(next http.HandlerFunc) http.HandlerFunc {
+	// 注意这里是http.HandlerFunc
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.getContextUser(r)
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// 鉴权：需要登录过、且是激活账户
+func (app *application) authenticatedActivated(next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.getContextUser(r)
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+	return app.authenticatedRequired(fn)
 }
