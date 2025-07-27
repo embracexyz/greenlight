@@ -44,6 +44,13 @@ func (p *password) Matches(plaintextPassword string) (bool, error) {
 	return true, nil
 }
 
+// 预定义一个匿名用户
+var AnoymousUser = &User{}
+
+func (u *User) IsAnonymous() bool {
+	return u == AnoymousUser
+}
+
 type User struct {
 	ID        int64     `json:"id"`
 	CreatedAt time.Time `json:"created_at"`

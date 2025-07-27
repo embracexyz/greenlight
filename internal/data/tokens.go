@@ -12,16 +12,17 @@ import (
 )
 
 const (
-	ScopeActivation    = "activation"
-	ScopePasswordReset = "password-reset"
+	ScopeActivation     = "activation"
+	ScopeAuthentication = "authentication"
+	ScopePasswordReset  = "password-reset"
 )
 
 type Token struct {
 	Plaintext string    `json:"token"`
 	Hash      []byte    `json:"-"`
-	UserID    int64     `json:"user_id"`
+	UserID    int64     `json:"-"`
 	Expiry    time.Time `json:"expiry"`
-	Scope     string    `json:"scope"`
+	Scope     string    `json:"-"`
 }
 
 func ValidatorToken(v *validator.Validator, tokenPlainText string) {
