@@ -12,16 +12,18 @@ func (app *application) routes() http.Handler {
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
 	router.MethodNotAllowed = http.HandlerFunc(app.methodNotAllowedResponse)
 
+	// 匿名用户即可
 	router.HandlerFunc(http.MethodGet, "/v1/healthcheck", app.healthcheckHandler)
 
 	// 所有登录账户即可访问
 	router.HandlerFunc(http.MethodGet, "/v1/movies", app.authenticatedRequired(app.listMoviesHandler))
-	// 登录且激活账户可访问
-	router.HandlerFunc(http.MethodPost, "/v1/movies", app.authenticatedActivated(app.createMovieHandler))
-	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.authenticatedActivated(app.showMovieHandler))
-	router.HandlerFunc(http.MethodPut, "/v1/movies/:id", app.authenticatedActivated(app.updateMovieHandler))
-	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.authenticatedActivated(app.partialUpdateMovieHandler))
-	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.authenticatedActivated(app.deleteMovieHandler))
+
+	// 登录且激活账户、且需要满足相应权限的用户
+	router.HandlerFunc(http.MethodPost, "/v1/movies", app.requirePermission("movies:write", app.createMovieHandler))
+	router.HandlerFunc(http.MethodGet, "/v1/movies/:id", app.requirePermission("movies:read", app.showMovieHandler))
+	router.HandlerFunc(http.MethodPut, "/v1/movies/:id", app.requirePermission("movies:write", app.updateMovieHandler))
+	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.requirePermission("movies:write", app.partialUpdateMovieHandler))
+	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.requirePermission("movies:write", app.deleteMovieHandler))
 
 	// users
 	router.HandlerFunc(http.MethodPost, "/v1/users", app.registerUserHandler)

@@ -31,12 +31,17 @@ type Models struct {
 		Insert(*Token) error
 		DeleteAllForUser(string, int64) error
 	}
+	PermisionModel interface {
+		GetAllForUser(int64) (Permisions, error)
+		AddForUser(int64, ...string) error
+	}
 }
 
 func NewModels(db *sql.DB) Models {
 	return Models{
-		MovieModel: NewMovieModel(db),
-		UserModel:  NewUserModel(db),
-		TokenModel: NewTokenModel(db),
+		MovieModel:     NewMovieModel(db),
+		UserModel:      NewUserModel(db),
+		TokenModel:     NewTokenModel(db),
+		PermisionModel: NewPermisionModel(db),
 	}
 }

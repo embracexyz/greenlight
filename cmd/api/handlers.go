@@ -318,6 +318,14 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
+
+	// init default permission
+	err = app.models.PermisionModel.AddForUser(user.ID, "movies:read")
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
 	// response
 	// generate token
 	token, err := app.models.TokenModel.New(user.ID, 3*24*time.Hour, data.ScopeActivation)

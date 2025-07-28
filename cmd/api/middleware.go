@@ -158,3 +158,21 @@ func (app *application) authenticatedActivated(next http.HandlerFunc) http.Handl
 	})
 	return app.authenticatedRequired(fn)
 }
+
+// 先经过auth拿到user信息，后续经过需要登录用户，再经过需要激活用户、最后需要满足所需权限
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.getContextUser(r)
+		permissions, err := app.models.PermisionModel.GetAllForUser(user.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+		if !permissions.Include(code) {
+			app.notPermittedResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+	return app.authenticatedActivated(fn)
+}
