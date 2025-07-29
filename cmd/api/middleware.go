@@ -176,3 +176,38 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 	})
 	return app.authenticatedActivated(fn)
 }
+
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 只有Origin 和 Access-Control-Request-Method的值相同才让浏览器缓存，避免恶意请求富有cors的缓存设置
+		// If your code makes a decision about what to return based on the content of a request header,
+		// you should include that header name in your Vary response header — even if the request didn’t include that header.
+		w.Header().Add("Vary", "Origin")
+		w.Header().Add("Vary", "Access-Control-Request-Method")
+
+		origin := r.Header.Get("Origin")
+		if origin != "" && len(app.config.cors.trustedOrigins) != 0 {
+			for i := range app.config.cors.trustedOrigins {
+				if origin == app.config.cors.trustedOrigins[i] {
+					// 有选择放行信任origin的请求
+
+					// 这里只针对简单cors放行
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+
+					// 这里处理非简单请求的 prefilght请求
+					// 当信任的origin请求过来时，添加了allow-orign 之后再判断如果是preflighting请求(3要素，Access-Control-Request-Method有值、origin有值、method为option），
+					// 就对应处理，避免preflighting不过导致浏览器不发送后续真实请求
+					// 这里allow-methods没有post，因为post允许简单跨域请求
+					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+						w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, PUT, PATCH, DELETE")
+						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
