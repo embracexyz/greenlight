@@ -4,12 +4,13 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tomasen/realip"
 
 	"github.com/embracexyz/greenlight/internal/data"
 	"github.com/embracexyz/greenlight/internal/validator"
@@ -64,11 +65,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		//		中间件、业务handler、router，都是handler，都实现了ServeHTTP方法，都会被在多个goroutine执行
 		// 所以要注意data race场景，
 		if app.config.limiter.enabled {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				app.serverErrorResponse(w, r, err)
-				return
-			}
+			ip := realip.FromRequest(r)
 
 			// 访问同一个map，加锁
 			mu.Lock()

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"expvar"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"strconv"
@@ -19,7 +20,8 @@ import (
 	"github.com/embracexyz/greenlight/internal/mailer"
 )
 
-const version = "1.0.0"
+var version string
+var buildTime string
 
 type config struct {
 	port int
@@ -112,8 +114,16 @@ func main() {
 		return nil
 	})
 
+	var displayVersion bool
+	flag.BoolVar(&displayVersion, "version", false, "Display version and exit")
+
 	flag.Parse()
 
+	if displayVersion {
+		fmt.Printf("Version:\t%s\n", version)
+		fmt.Printf("Build time:\t%s\n", buildTime)
+		os.Exit(0)
+	}
 	logger := jsonlog.New(os.Stdout, jsonlog.INFO)
 
 	// conn db

@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	ErrRecordNotFound = errors.New("record not found!")
-	ErrEditConflict   = errors.New("edit confict!")
+	ErrRecordNotFound = errors.New("record not found")
+	ErrEditConflict   = errors.New("edit confict")
 )
 
 // 包含所有model，作为统一的引用入口

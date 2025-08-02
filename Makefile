@@ -1,6 +1,11 @@
 include .envrc
 
 
+# ==================================================================================== # 
+# HELPERS
+# ==================================================================================== #
+
+
 ## help: print this help message
 .PHONY: help
 help:
@@ -10,6 +15,12 @@ help:
 .PHONY: confirm
 confirm:
 	@echo -n 'Are you sure? [y/n]' && read ans && [ $${ans:-N} = y ]
+
+
+# ==================================================================================== # 
+# DEVELOPMENT
+# ==================================================================================== #
+
 
 ## run/api: run the cmd/api application
 .PHONY: run/api
@@ -32,3 +43,45 @@ db/migrations/up: confirm
 db/migrations/new:
 	@echo 'creating migration files for ${name}...'
 	migrate create -seq -ext=.sql -dir=./migrations ${name}
+
+
+# ==================================================================================== # 
+# QUALITY CONTROL
+# ==================================================================================== #
+
+
+## audit: tidy dependencies and format , vet, and test all code
+.PHONY: audit
+audit: vendor
+	@echo 'Formatting code...'
+	go fmt ./...
+	@echo 'Vetting code...'
+	go vet ./...
+	staticcheck ./...
+	@echo 'Running tests...'
+	go test -race -vet=off ./...
+
+## vendor: tidy and vendor dependencies
+.PHONY: vendor
+vendor:
+	@echo 'Tidying and verifying module dependencies...' 
+	go mod tidy
+	go mod verify
+	@echo 'Vendoring dependencies...'
+	go mod vendor
+
+
+# ==================================================================================== # 
+# BUILD
+# ==================================================================================== #
+
+current_time=$(shell data --iso-8601=seconds)
+version=$(shell git describe --always --dirty --tags --long)
+ldflags='-s -X main.buildTime=$current_time -X main.version=$version'
+
+## build/api: build the cmd/api application
+.PHONY: build/api
+build/api:
+	@echo 'building cm/api...'
+	go build -ldflags=${ldflags} -o=./bin/api ./cmd/api
+	GOOS=linux GOARCH=amd64 go build -ldflags=${ldflags} -o=./bin/linux_amd64/api ./cmd/api
