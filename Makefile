@@ -75,9 +75,9 @@ vendor:
 # BUILD
 # ==================================================================================== #
 
-current_time=$(shell data --iso-8601=seconds)
-version=$(shell git describe --always --dirty --tags --long)
-ldflags='-s -X main.buildTime=$current_time -X main.version=$version'
+current_time = $(shell date +"%Y-%m-%dT%H:%M:%S%z")
+git_description = $(shell git describe --always --dirty --tags --long)
+ldflags='-s -X main.buildTime=${current_time} -X main.version=${git_description}'
 
 ## build/api: build the cmd/api application
 .PHONY: build/api
