@@ -21,6 +21,7 @@ type Models struct {
 		GetAll(string, []string, Filters) ([]*Movie, Metadata, error)
 	}
 	UserModel interface {
+		Get(int64) (*User, error)
 		Insert(*User) error
 		GetByEmail(string) (*User, error)
 		Update(*User) error

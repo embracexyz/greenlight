@@ -47,6 +47,9 @@ type config struct {
 	cors struct {
 		trustedOrigins []string
 	}
+	jwt struct {
+		secret string
+	}
 }
 
 type application struct {
@@ -113,6 +116,8 @@ func main() {
 		cfg.cors.trustedOrigins = strings.Fields(s)
 		return nil
 	})
+
+	flag.StringVar(&cfg.jwt.secret, "jwt-secret", "", "jwt-secret")
 
 	var displayVersion bool
 	flag.BoolVar(&displayVersion, "version", false, "Display version and exit")

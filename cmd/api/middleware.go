@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pascaldekloe/jwt"
 	"github.com/tomasen/realip"
 
 	"github.com/embracexyz/greenlight/internal/data"
-	"github.com/embracexyz/greenlight/internal/validator"
 	"github.com/felixge/httpsnoop"
 	"golang.org/x/time/rate"
 )
@@ -107,15 +107,35 @@ func (app *application) authentication(next http.Handler) http.Handler {
 		}
 		auth := headerParts[1]
 
-		v := validator.New()
-		if data.ValidatorToken(v, auth); !v.Valid() {
+		// 从token获取userID信息
+		claims, err := jwt.HMACCheck([]byte(auth), []byte(app.config.jwt.secret))
+		if err != nil {
 			app.invalidAuthenticationTokenResponse(w, r)
 			return
 		}
 
-		// 根据token查询用户
+		if !claims.Valid(time.Now()) {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
 
-		user, err := app.models.UserModel.GetForToken(data.ScopeAuthentication, auth)
+		if claims.Issuer != "greenlight.xyz" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		if !claims.AcceptAudience("greenlight.xyz") {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		userID, err := strconv.ParseInt(claims.Subject, 10, 64)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		user, err := app.models.UserModel.Get(userID)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
@@ -125,6 +145,25 @@ func (app *application) authentication(next http.Handler) http.Handler {
 			}
 			return
 		}
+
+		// v := validator.New()
+		// if data.ValidatorToken(v, auth); !v.Valid() {
+		// 	app.invalidAuthenticationTokenResponse(w, r)
+		// 	return
+		// }
+
+		// // 根据token查询用户
+
+		// user, err := app.models.UserModel.GetForToken(data.ScopeAuthentication, auth)
+		// if err != nil {
+		// 	switch {
+		// 	case errors.Is(err, data.ErrRecordNotFound):
+		// 		app.invalidAuthenticationTokenResponse(w, r)
+		// 	default:
+		// 		app.serverErrorResponse(w, r, err)
+		// 	}
+		// 	return
+		// }
 
 		r = app.setContextUser(r, user)
 		next.ServeHTTP(w, r)
